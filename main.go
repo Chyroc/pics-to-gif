@@ -1,11 +1,15 @@
 package main
 
 import (
+	"flag"
+	"fmt"
 	"image"
 	"image/gif"
 	"image/png"
 	"io/ioutil"
+	"log"
 	"os"
+	"strings"
 	"sync"
 	"time"
 
@@ -22,6 +26,10 @@ type Image struct {
 	Img *image.Paletted
 	Err error
 }
+
+var folder string
+var outFilename string
+var gorou int
 
 func ReadFileList(folder string) ([]string, error) {
 	files, err := ioutil.ReadDir(folder)
@@ -128,9 +136,45 @@ func Run(folder, output string, p int) error {
 	return err
 }
 
+func init() {
+	if len(os.Args) == 1 || strings.ToUpper(os.Args[1]) == "-H" || strings.ToUpper(os.Args[1]) == "--HELP" {
+		fmt.Printf(`NAME:
+   pics-to-gif - 图片转GIF动图
+
+USAGE:
+   t -f folder [-o out_filename] [-p goroutine]
+
+VERSION:
+   v0.1.0
+
+ARGS:
+     -f   图片所在文件夹
+     -o   输出GIF文件名
+     -p   并发数
+
+GLOBAL OPTIONS:
+   --help, -h     show help
+   --version, -v  print the version
+`)
+		os.Exit(0)
+	}
+
+	flag.StringVar(&folder, "f", "", "")
+	flag.StringVar(&outFilename, "o", "out.gif", "")
+	flag.IntVar(&gorou, "p", 10, "")
+	flag.Parse()
+
+	if folder == "" || outFilename == "" {
+		log.Fatal(fmt.Sprintf("-f or -o 不能为空"))
+	}
+	if gorou <= 0 {
+		log.Fatal(fmt.Sprintf("-p 必须大于0"))
+	}
+}
+
 func main() {
-	err := Run("./", "./out.gif", 1)
+	err := Run(folder, outFilename, gorou)
 	if err != nil {
-		panic(err)
+		log.Fatal(fmt.Sprintf("Err [%s]", err))
 	}
 }
