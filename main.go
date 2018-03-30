@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"image"
 	"image/gif"
+	"image/jpeg"
 	"image/png"
 	"io/ioutil"
 	"log"
@@ -52,9 +53,28 @@ func ReadToGif(filename string) (*image.Paletted, error) {
 	}
 	defer f.Close()
 
-	simage, err := png.Decode(f)
-	if err != nil {
-		return nil, err
+	filenameSuffixs := strings.Split(filename, ".")
+	filenameSuffix := strings.ToUpper(filenameSuffixs[len(filenameSuffixs)-1])
+
+	var simage image.Image
+	switch filenameSuffix {
+	case "PNG":
+		simage, err = png.Decode(f)
+		if err != nil {
+			return nil, err
+		}
+	case "GIF":
+		simage, err = gif.Decode(f)
+		if err != nil {
+			return nil, err
+		}
+	case "JPEG":
+		simage, err = jpeg.Decode(f)
+		if err != nil {
+			return nil, err
+		}
+	default:
+		return nil, fmt.Errorf("unsupport image type(%s)", filenameSuffix)
 	}
 
 	bounds := simage.Bounds()
