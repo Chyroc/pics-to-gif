@@ -1,15 +1,16 @@
 package main
 
 import (
-	"fmt"
 	"image"
 	"image/gif"
 	"image/png"
 	"io/ioutil"
 	"os"
 	"sync"
+	"time"
 
 	"github.com/andybons/gogif"
+	"gopkg.in/cheggaaa/pb.v1"
 )
 
 type File struct {
@@ -72,17 +73,23 @@ func Run(folder, output string, p int) error {
 		return err
 	}
 
-	var fs = make(chan File, len(files))
-	var gs = make([]Image, len(files))
+	fileCount := len(files)
+
+	FilePb := pb.StartNew(fileCount).Prefix("File ")
+	var fs = make(chan File, fileCount)
+	var gs = make([]*image.Paletted, fileCount)
 	var outGif = new(gif.GIF)
 
 	for k, v := range files {
+		FilePb.Increment()
 		fs <- File{
 			Index: k,
 			Name:  v,
 		}
 	}
+	FilePb.Finish()
 
+	ReadImgPb := pb.StartNew(fileCount).Prefix("ReadImg ")
 	var sw sync.WaitGroup
 	for i := 0; i < p; i++ {
 		sw.Add(1)
@@ -91,12 +98,12 @@ func Run(folder, output string, p int) error {
 			for {
 				select {
 				case f := <-fs:
-					fmt.Printf("%d\n", f.Index)
 					img, err := ReadToGif(f.Name)
-					gs[f.Index] = Image{
-						Img: img,
-						Err: err,
+					if err != nil {
+						panic(f.Name)
 					}
+					gs[f.Index] = img
+					ReadImgPb.Increment()
 				default:
 					return
 				}
@@ -104,20 +111,25 @@ func Run(folder, output string, p int) error {
 		}()
 	}
 	sw.Wait()
+	ReadImgPb.Finish()
 
+	AppendGIFPb := pb.StartNew(fileCount + 1).Prefix("AppendGIF ")
 	for _, v := range gs {
-		if v.Err != nil {
-			return err
-		}
-		outGif.Image = append(outGif.Image, v.Img)
+		outGif.Image = append(outGif.Image, v)
 		outGif.Delay = append(outGif.Delay, 0)
+		AppendGIFPb.Increment()
+		time.Sleep(time.Second)
 	}
+	err = SveAsGif(output, outGif)
 
-	return SveAsGif(output, outGif)
+	AppendGIFPb.Increment()
+	AppendGIFPb.Finish()
+
+	return err
 }
 
 func main() {
-	err := Run("./", "out.gif", 20)
+	err := Run("./", "./out.gif", 1)
 	if err != nil {
 		panic(err)
 	}
